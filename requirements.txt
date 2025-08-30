@@ -1,4 +1,2 @@
 Flask
-adif_uploads
-pandas
-matplotlib
+psycopg2-binary
