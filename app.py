@@ -17,17 +17,21 @@ def parse_adif_content(adif_content):
     and returns a list of contact records.
     """
     records = []
-    # Use regex to find QSO record blocks
-    qso_blocks = re.split(r'<EOR>', adif_content, flags=re.IGNORECASE)
+    # Use a more robust regex to find each ADIF tag and its value
+    # This new regex correctly handles the tag format <TAGNAME:length>VALUE
+    tags_regex = re.compile(r'<(\w+)(?::\d+)*>([^<]+)', re.IGNORECASE)
+    
+    # Split the content into QSO record blocks using <EOR>
+    qso_blocks = adif_content.split('<EOR>')
     
     for block in qso_blocks:
         if not block.strip():
             continue
             
         record = {}
-        # Find each tag and value using regex
-        tags = re.findall(r'<(\w+):(\d+)>([^<]+)', block, re.IGNORECASE)
-        for tag, length, value in tags:
+        # Find all tags and values within the current QSO block
+        tags = tags_regex.findall(block)
+        for tag, value in tags:
             record[tag.lower()] = value
             
         # If the QSO record has the required information, add it to the list
@@ -188,7 +192,7 @@ if __name__ == "__main__":
     if not db_exists:
         print("Database does not exist. Processing uploaded ADIF files...")
         
-        adif_files = [f for f in os.listdir(adif_folder_path) if f.endswith(('.adif', '.adi'))]
+        adif_files = [f for f in os.listdir(adif_folder_path) if f.lower().endswith(('.adif', '.adi'))]
         if not adif_files:
             print("No ADIF files found in the 'adif_uploads' folder. The server will run with an empty database.")
         else:
