@@ -1,4 +1,4 @@
 Flask
-adif_parser_for_qsl_card_maker
+adif_uploads
 pandas
 matplotlib
