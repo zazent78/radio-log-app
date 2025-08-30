@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amateur Radio Log System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+            background-color: #1126A8; /* International Klein Blue */
+        }
+        .dark {
+            background-color: #000000;
+        }
+        .card {
+            background-color: #000000;
+            box-shadow: 0 4px 6px rgba(253, 208, 1, 0.4);
+            color: #FDD001;
+        }
+        .stats-card {
+            background-color: #1329AE;
+            color: #FDD001;
+        }
+        .dark .card {
+            background-color: #1329AE;
+            box-shadow: 0 4px 6px rgba(253, 208, 1, 0.4);
+            color: #FDD001;
+        }
+        .dark .stats-card {
+            background-color: #000000;
+        }
+        .dark input {
+            background-color: #1329AE;
+            color: #FDD001;
+            border-color: #FDD001;
+        }
+        .dark table {
+            background-color: #1126A8;
+        }
+        .dark th {
+            background-color: #000000;
+            color: #FDD001;
+        }
+        .dark tr:nth-child(even) {
+            background-color: #1329AE;
+        }
+        .dark tr:nth-child(odd) {
+            background-color: #1126A8;
+        }
+        .btn-primary {
+            background-color: #FDD001;
+            color: #000000;
+        }
+        .btn-primary:hover {
+            background-color: #fceb5c;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Header & Dark Mode Toggle -->
+    <header class="w-full text-center py-8">
+        <div class="flex justify-center items-center mb-4">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-800 dark:text-gray-100" style="color:#FDD001">Amateur Radio Log System</h1>
+            <button id="theme-toggle" class="ml-4 p-2 rounded-full bg-black text-white transition-colors duration-200" style="background-color: #000000; color: #FDD001">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
+                </svg>
+            </button>
+        </div>
+        <p class="text-gray-500 dark:text-gray-400 mt-2" style="color: #FDD001">Dashboard & Contact Record Search</p>
+    </header>
+
+    <!-- Main Content Container -->
+    <div class="container mx-auto space-y-6">
+
+        <!-- Stats Section -->
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Total Contacts Card -->
+            <div id="total-contacts-card" class="card stats-card p-6 flex flex-col items-center rounded-xl transition-transform duration-200 hover:scale-105">
+                <span class="text-gray-400 text-sm" style="color:#FDD001">Total Contacts</span>
+                <p id="total-contacts" class="text-2xl font-bold mt-2">{{ stats.total_contacts }}</p>
+            </div>
+
+            <!-- Unique Stations Card -->
+            <div id="unique-stations-card" class="card stats-card p-6 flex flex-col items-center rounded-xl transition-transform duration-200 hover:scale-105">
+                <span class="text-gray-400 text-sm" style="color:#FDD001">Unique Stations</span>
+                <p id="unique-stations" class="text-2xl font-bold mt-2">{{ stats.unique_stations }}</p>
+            </div>
+
+            <!-- Most Active Station Card -->
+            <div id="most-active-card" class="card stats-card p-6 flex flex-col items-center rounded-xl transition-transform duration-200 hover:scale-105">
+                <span class="text-gray-400 text-sm" style="color:#FDD001">Most Active Station</span>
+                <p id="most-active-station" class="text-lg font-bold mt-2 truncate">{{ stats.most_active_contact }}</p>
+            </div>
+        </section>
+
+        <!-- Search and Records Section -->
+        <section class="card p-6 rounded-xl shadow-lg">
+            <h2 class="text-2xl font-semibold text-gray-800 dark:text-gray-100 mb-4" style="color:#FDD001">Contact Record Search</h2>
+            <form id="search-form" method="POST" action="/" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                <input type="text" name="query" id="search-input" placeholder="Search Station Callsign..." value="{{ query }}" class="flex-grow p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FDD001] transition-colors duration-200" style="background-color: #1126A8; border-color: #FDD001; color: #FDD001;">
+                <button type="submit" class="btn-primary px-6 py-3 rounded-lg font-semibold hover:bg-yellow-400 transition duration-200">
+                    Search <span id="loading-spinner" class="hidden ml-2">...</span>
+                </button>
+            </form>
+
+            <div class="mt-6">
+                {% if error_message %}
+                    <p class="text-lg font-semibold text-red-500 mb-4">{{ error_message }}</p>
+                {% elif contact_records is defined and contact_records %}
+                    <p id="search-results-message" class="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300" style="color:#FDD001">Found {{ contact_records|length }} contacts:</p>
+                {% else %}
+                    <p id="search-results-message" class="mb-4 text-lg font-semibold text-gray-700 dark:text-gray-300" style="color:#FDD001">No records found. Please try another search.</p>
+                {% endif %}
+                <div id="table-container" class="overflow-x-auto rounded-lg">
+                    <!-- Table will be populated by the Flask backend -->
+                    <table class="min-w-full">
+                        <thead>
+                            <tr>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Master Station</th>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Callsign</th>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Band</th>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Mode</th>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Date</th>
+                                <th class="py-3 px-6 text-xs uppercase tracking-wider font-semibold" style="background-color: #000000; color: #FDD001">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="contact-table-body">
+                            {% for record in contact_records %}
+                            <tr style="color: #FDD001;" class="{% if loop.index is divisibleby 2 %}bg-white dark:bg-[#1329AE]{% else %}bg-white dark:bg-[#1126A8]{% endif %} border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-[#1a34c9] transition-colors duration-200">
+                                <td class="py-4 px-6">{{ record.station_callsign }}</td>
+                                <td class="py-4 px-6">{{ record.contact_callsign }}</td>
+                                <td class="py-4 px-6">{{ record.band }}</td>
+                                <td class="py-4 px-6">{{ record.mode }}</td>
+                                <td class="py-4 px-6">{{ record.qso_date }}</td>
+                                <td class="py-4 px-6">{{ record.time_on }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- JavaScript for Dark Mode Toggle -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const themeToggle = document.getElementById('theme-toggle');
+
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('dark');
+            });
+        });
+    </script>
+</body>
+</html>
