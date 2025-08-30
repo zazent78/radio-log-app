@@ -18,8 +18,8 @@ def parse_adif_content(adif_content):
     """
     records = []
     # Use a more robust regex to find each ADIF tag and its value
-    # This new regex correctly handles the tag format <TAGNAME:length>VALUE
-    tags_regex = re.compile(r'<(\w+)(?::\d+)*>([^<]+)', re.IGNORECASE)
+    # This regex now handles both <TAGNAME:length>VALUE and <TAGNAME>VALUE
+    tags_regex = re.compile(r'<(\w+)(?::\d+)?>([^<]+)', re.IGNORECASE)
     
     # Split the content into QSO record blocks using <EOR>
     qso_blocks = adif_content.split('<EOR>')
@@ -32,7 +32,7 @@ def parse_adif_content(adif_content):
         # Find all tags and values within the current QSO block
         tags = tags_regex.findall(block)
         for tag, value in tags:
-            record[tag.lower()] = value
+            record[tag.lower()] = value.strip()
             
         # If the QSO record has the required information, add it to the list
         if all(key in record for key in ['station_callsign', 'call', 'band', 'mode', 'qso_date', 'time_on']):
