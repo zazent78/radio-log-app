@@ -11,24 +11,26 @@ os.makedirs(ADIF_FOLDER, exist_ok=True)
 
 app = Flask(__name__)
 
+import re
+
 def parse_adif_content(adif_content):
     """
-    Menghuraikan kandungan ADIF (Amateur Data Interchange Format)
-    dan mengembalikan senarai rekod hubungan.
+    Menghuraikan kandungan ADIF dan mengembalikan senarai rekod hubungan.
+    Kod ini lebih mantap untuk mengendalikan rekod terakhir yang tidak ditutup dengan <eor>.
     """
     records = []
-    # Gunakan regex yang lebih mantap untuk mencari setiap tag ADIF dan nilainya
+    # Ekspresi nalar yang mencari keseluruhan blok rekod dari <call:...> hingga <eor> atau akhir fail.
+    # ?s membenarkan '.' untuk sepadan dengan aksara baris baru (newline).
+    # (?=...) ialah "lookahead" yang memastikan rekod tamat di <eor> atau akhir rentetan.
+    qso_regex = re.compile(r'<call:\d+>.*?<eor>|<call:\d+>.*$', re.IGNORECASE | re.DOTALL)
+    
+    # Cari semua blok perhubungan yang sepadan
+    qso_blocks = qso_regex.findall(adif_content)
+    
     tags_regex = re.compile(r'<(\w+)(?::\d+)?>([^<]+)', re.IGNORECASE)
     
-    # Pisahkan kandungan ke dalam blok rekod QSO menggunakan <EOR>
-    qso_blocks = adif_content.split('<EOR>')
-    
     for block in qso_blocks:
-        if not block.strip():
-            continue
-            
         record = {}
-        # Cari semua tag dan nilai dalam blok QSO semasa
         tags = tags_regex.findall(block)
         for tag, value in tags:
             record[tag.lower()] = value.strip()
