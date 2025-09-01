@@ -3,7 +3,7 @@ import os
 import re
 from flask import Flask, render_template, request
 
-# Define the absolute path for the database
+# Tentukan laluan mutlak untuk pangkalan data
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(PROJECT_ROOT, "contact_logs.db")
 ADIF_FOLDER = os.path.join(PROJECT_ROOT, 'adif_uploads')
@@ -13,15 +13,14 @@ app = Flask(__name__)
 
 def parse_adif_content(adif_content):
     """
-    Parses the content of an ADIF (Amateur Data Interchange Format)
-    and returns a list of contact records.
+    Menghuraikan kandungan ADIF (Amateur Data Interchange Format)
+    dan mengembalikan senarai rekod hubungan.
     """
     records = []
-    # Use a more robust regex to find each ADIF tag and its value
-    # This regex now handles both <TAGNAME:length>VALUE and <TAGNAME>VALUE
+    # Gunakan regex yang lebih mantap untuk mencari setiap tag ADIF dan nilainya
     tags_regex = re.compile(r'<(\w+)(?::\d+)?>([^<]+)', re.IGNORECASE)
     
-    # Split the content into QSO record blocks using <EOR>
+    # Pisahkan kandungan ke dalam blok rekod QSO menggunakan <EOR>
     qso_blocks = adif_content.split('<EOR>')
     
     for block in qso_blocks:
@@ -29,12 +28,12 @@ def parse_adif_content(adif_content):
             continue
             
         record = {}
-        # Find all tags and values within the current QSO block
+        # Cari semua tag dan nilai dalam blok QSO semasa
         tags = tags_regex.findall(block)
         for tag, value in tags:
             record[tag.lower()] = value.strip()
             
-        # If the QSO record has the required information, add it to the list
+        # Jika rekod QSO mempunyai maklumat yang diperlukan, tambahkan ke dalam senarai
         if all(key in record for key in ['station_callsign', 'call', 'band', 'mode', 'qso_date', 'time_on']):
             records.append({
                 'station_callsign': record.get('station_callsign', 'N/A'),
@@ -49,13 +48,13 @@ def parse_adif_content(adif_content):
 
 def create_and_save_contacts_to_db(contacts):
     """
-    Creates a 'logs' table if it doesn't exist
-    and saves contact records to the database.
+    Mencipta jadual 'logs' jika tidak wujud
+    dan menyimpan rekod hubungan ke pangkalan data.
     """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     
-    # Create the 'logs' table
+    # Cipta jadual 'logs'
     c.execute('''
         CREATE TABLE IF NOT EXISTS logs (
             id INTEGER PRIMARY KEY,
@@ -78,52 +77,88 @@ def create_and_save_contacts_to_db(contacts):
     conn.commit()
     conn.close()
 
-def get_stats():
-    """Fetches brief statistics from the database."""
+# --- Fungsi Baru untuk Statistik ---
+
+def get_unique_station_callsigns():
+    """Mengambil senarai unik semua stesen master."""
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
+        c.execute("SELECT DISTINCT station_callsign FROM logs ORDER BY station_callsign")
+        stations = [row[0] for row in c.fetchall()]
+        conn.close()
+        return stations
+    except sqlite3.OperationalError:
+        return []
 
-        # Total contacts
+def get_global_stats():
+    """Mengambil statistik global ringkas dari pangkalan data."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
         c.execute("SELECT COUNT(*) FROM logs")
         total_contacts = c.fetchone()[0]
-
-        # Unique stations
         c.execute("SELECT COUNT(DISTINCT contact_callsign) FROM logs")
         unique_stations = c.fetchone()[0]
-
-        # Most active contact (station with the most QSOs)
-        c.execute("""
-            SELECT contact_callsign, COUNT(*) as cnt 
-            FROM logs 
-            GROUP BY contact_callsign 
-            ORDER BY cnt DESC 
-            LIMIT 1
-        """)
+        c.execute("SELECT contact_callsign, COUNT(*) as cnt FROM logs GROUP BY contact_callsign ORDER BY cnt DESC LIMIT 1")
         row = c.fetchone()
-        
-        most_active_contact = f"{row[0]} ({row[1]} contact)" if row and row[0] else "No Data"
-
+        most_active_contact = f"{row[0]} ({row[1]} contact)" if row and row[0] else "Tiada Data"
         conn.close()
-
         return {
             "total_contacts": total_contacts,
-            "unique_stations": unique_stations, 
+            "unique_stations": unique_stations,
             "most_active_contact": most_active_contact
         }
     except sqlite3.OperationalError as e:
-        print(f"Database error: {e}. Please ensure you have processed an ADIF file.")
+        print(f"Ralat pangkalan data: {e}")
+        return {"total_contacts": 0, "unique_stations": 0, "most_active_contact": "Tiada Data"}
+
+def get_station_stats(callsign):
+    """Mengambil statistik untuk stesen master yang dipilih."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        # Jumlah kontak untuk stesen ini
+        c.execute("SELECT COUNT(*) FROM logs WHERE station_callsign = ?", (callsign,))
+        total_contacts = c.fetchone()[0]
+        # Jumlah stesen unik yang dihubungi oleh stesen ini
+        c.execute("SELECT COUNT(DISTINCT contact_callsign) FROM logs WHERE station_callsign = ?", (callsign,))
+        unique_contacts = c.fetchone()[0]
+        # Kontak paling aktif yang dihubungi oleh stesen ini
+        c.execute("""
+            SELECT contact_callsign, COUNT(*) as cnt 
+            FROM logs 
+            WHERE station_callsign = ? 
+            GROUP BY contact_callsign 
+            ORDER BY cnt DESC 
+            LIMIT 1
+        """, (callsign,))
+        row = c.fetchone()
+        most_active_contact = f"{row[0]} ({row[1]} contact)" if row and row[0] else "Tiada Data"
+        conn.close()
         return {
-            "total_contacts": 0,
-            "unique_stations": 0,
-            "most_active_contact": "No Data"
+            "total_contacts": total_contacts,
+            "unique_contacts": unique_contacts,
+            "most_active_contact": most_active_contact,
+            "callsign": callsign
         }
+    except sqlite3.OperationalError as e:
+        print(f"Ralat pangkalan data: {e}")
+        return None
+
+# --- Laluan Flask ---
 
 @app.route("/", methods=['GET', 'POST'])
 def index():
     query = ""
     contact_records = []
-    stats = get_stats()
+    selected_station_stats = None
+    
+    # Dapatkan senarai stesen master yang unik untuk menu lungsur
+    station_masters = get_unique_station_callsigns()
+    
+    # Dapatkan statistik global
+    global_stats = get_global_stats()
 
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -131,70 +166,64 @@ def index():
         c = conn.cursor()
 
         if request.method == 'POST':
-            query = request.form.get('query', '')
-            if query:
+            # Semak borang mana yang dihantar
+            if 'query' in request.form:
+                query = request.form.get('query', '')
+                if query:
+                    c.execute("""
+                        SELECT station_callsign, contact_callsign, band, mode, qso_date, time_on
+                        FROM logs 
+                        WHERE station_callsign LIKE ? OR contact_callsign LIKE ?
+                        ORDER BY qso_date DESC, time_on DESC
+                    """, (f"%{query}%", f"%{query}%"))
+                    contact_records = c.fetchall()
+                else:
+                    c.execute("SELECT * FROM logs ORDER BY qso_date DESC, time_on DESC")
+                    contact_records = c.fetchall()
+            elif 'station_master' in request.form:
+                selected_callsign = request.form.get('station_master')
+                selected_station_stats = get_station_stats(selected_callsign)
+                # Dapatkan rekod untuk stesen yang dipilih sahaja
                 c.execute("""
-                    SELECT 
-                        station_callsign,
-                        contact_callsign,
-                        band,
-                        mode,
-                        qso_date,
-                        time_on
-                    FROM logs 
-                    WHERE station_callsign LIKE ? OR contact_callsign LIKE ?
-                    ORDER BY qso_date DESC, time_on DESC
-                """, (f"%{query}%", f"%{query}%"))
-                contact_records = c.fetchall()
-            else:
-                c.execute("""
-                    SELECT 
-                        station_callsign,
-                        contact_callsign,
-                        band,
-                        mode,
-                        qso_date,
-                        time_on
+                    SELECT station_callsign, contact_callsign, band, mode, qso_date, time_on
                     FROM logs
+                    WHERE station_callsign = ?
                     ORDER BY qso_date DESC, time_on DESC
-                """)
+                """, (selected_callsign,))
                 contact_records = c.fetchall()
         else:
-            c.execute("""
-                SELECT 
-                    station_callsign,
-                    contact_callsign,
-                    band,
-                    mode,
-                    qso_date,
-                    time_on
-                FROM logs
-                ORDER BY qso_date DESC, time_on DESC
-            """)
+            # Laluan GET lalai
+            c.execute("SELECT * FROM logs ORDER BY qso_date DESC, time_on DESC")
             contact_records = c.fetchall()
 
         conn.close()
 
     except sqlite3.OperationalError as e:
-        print(f"Database error: {e}")
-        return render_template('index.html', stats=stats, query=query, error_message="Error: The database is inaccessible. Please ensure you have loaded contact records.")
-    
-    return render_template('index.html', stats=stats, query=query, contact_records=contact_records)
+        print(f"Ralat pangkalan data: {e}")
+        return render_template('index.html', 
+                                global_stats=global_stats, 
+                                station_masters=station_masters,
+                                query=query, 
+                                error_message="Ralat: Pangkalan data tidak boleh diakses. Sila pastikan anda telah memuatkan rekod kontak.")
+
+    return render_template('index.html', 
+                            global_stats=global_stats, 
+                            station_masters=station_masters,
+                            selected_station_stats=selected_station_stats, 
+                            query=query, 
+                            contact_records=contact_records)
 
 if __name__ == "__main__":
-    # ADIF file processing logic on startup
     adif_folder_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'adif_uploads')
     if not os.path.exists(adif_folder_path):
         os.makedirs(adif_folder_path)
 
-    # Check if the database already exists and has records
     db_exists = os.path.exists(DB_PATH)
     if not db_exists:
-        print("Database does not exist. Processing uploaded ADIF files...")
-        
+        print("Pangkalan data tidak wujud. Memproses fail ADIF yang dimuat naik...")
         adif_files = [f for f in os.listdir(adif_folder_path) if f.lower().endswith(('.adif', '.adi'))]
         if not adif_files:
-            print("No ADIF files found in the 'adif_uploads' folder. The server will run with an empty database.")
+            print("Tiada fail ADIF ditemui. Pelayan akan berjalan dengan pangkalan data kosong.")
         else:
             for adif_file in adif_files:
                 file_path = os.path.join(adif_folder_path, adif_file)
@@ -203,10 +232,9 @@ if __name__ == "__main__":
                         adif_content = f.read()
                     contacts = parse_adif_content(adif_content)
                     create_and_save_contacts_to_db(contacts)
-                    print(f"Successfully processed and saved records from {adif_file}.")
+                    print(f"Berjaya memproses dan menyimpan rekod dari {adif_file}.")
                 except Exception as e:
-                    print(f"Error while processing file {adif_file}: {e}")
+                    print(f"Ralat semasa memproses fail {adif_file}: {e}")
 
-    # Run the Flask application
-    print("Starting web server...")
+    print("Memulakan pelayan web...")
     app.run(debug=True)

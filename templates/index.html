@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Special Event Amateur Radio Log System</title>
+    <title>Special Event Amateur Radio Logging System</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -65,33 +65,64 @@
 
     <!-- Header -->
     <header class="w-full text-center py-8">
-        <h1 class="text-4xl font-bold text-gray-800">Special Event Amateur Radio Log System</h1>
+        <h1 class="text-4xl font-bold text-gray-800">Special Event Amateur Radio Logging System</h1>
         <p class="text-gray-500 mt-2">Dashboard & Contact Record Search</p>
     </header>
 
     <!-- Main Content Container -->
     <div class="container mx-auto space-y-6">
 
-        <!-- Stats Section -->
+        <!-- Global Statistics Section -->
+        <h2 class="text-2xl font-semibold text-gray-800">Global Statistics</h2>
         <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
             <!-- Total Contacts Card -->
             <div class="card stats-card p-6 flex flex-col items-center">
                 <span class="text-gray-400 text-sm">Total Contacts</span>
-                <p>{{ stats.total_contacts }}</p>
+                <p>{{ global_stats.total_contacts }}</p>
             </div>
-
             <!-- Unique Stations Card -->
             <div class="card stats-card p-6 flex flex-col items-center">
                 <span class="text-gray-400 text-sm">Unique Stations</span>
-                <p>{{ stats.unique_stations }}</p>
+                <p>{{ global_stats.unique_stations }}</p>
             </div>
-
-            <!-- Most Active Station Card -->
+            <!-- Most Active Contact Card -->
             <div class="card stats-card p-6 flex flex-col items-center">
-                <span class="text-gray-400 text-sm">Most Active Station</span>
-                <p class="text-base">{{ stats.most_active_contact }}</p>
+                <span class="text-gray-400 text-sm">Most Active Contact</span>
+                <p class="text-base">{{ global_stats.most_active_contact }}</p>
             </div>
         </section>
+
+        <!-- Station Master Selector Section -->
+        <section class="card p-6">
+            <h2 class="text-2xl font-semibold text-gray-800 mb-4">Station Master Statistics</h2>
+            <form action="/" method="post" class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 items-center">
+                <label for="station_master" class="text-gray-700 font-semibold">Select Station Master:</label>
+                <select id="station_master" name="station_master" onchange="this.form.submit()" class="flex-grow p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">-- Select Callsign --</option>
+                    {% for station in station_masters %}
+                        <option value="{{ station }}" {% if selected_station_stats and selected_station_stats.callsign == station %}selected{% endif %}>{{ station }}</option>
+                    {% endfor %}
+                </select>
+            </form>
+        </section>
+
+        <!-- Selected Station Statistics Section -->
+        {% if selected_station_stats %}
+        <section class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="card stats-card p-6 flex flex-col items-center">
+                <span class="text-gray-400 text-sm">Total Contacts for {{ selected_station_stats.callsign }}</span>
+                <p>{{ selected_station_stats.total_contacts }}</p>
+            </div>
+            <div class="card stats-card p-6 flex flex-col items-center">
+                <span class="text-gray-400 text-sm">Unique Contacts for {{ selected_station_stats.callsign }}</span>
+                <p>{{ selected_station_stats.unique_contacts }}</p>
+            </div>
+            <div class="card stats-card p-6 flex flex-col items-center">
+                <span class="text-gray-400 text-sm">Most Active Contact for {{ selected_station_stats.callsign }}</span>
+                <p class="text-base">{{ selected_station_stats.most_active_contact }}</p>
+            </div>
+        </section>
+        {% endif %}
 
         <!-- Search and Records Section -->
         <section class="card p-6">
@@ -133,7 +164,7 @@
                         </tbody>
                     </table>
                 {% else %}
-                    <p class="text-gray-500 text-center">No records found. Try another search or ensure your database has records.</p>
+                    <p class="text-gray-500 text-center">No records found. Try a different search or ensure your database has records.</p>
                 {% endif %}
             </div>
         </section>
